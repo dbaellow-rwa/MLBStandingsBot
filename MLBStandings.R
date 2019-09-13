@@ -23,7 +23,7 @@ TeamMascot <- "Nationals"
 League <- "NL"
 Division <- "East"
 
-#scrape the NL data fron Baseball Reference
+#scrape the league data fron Baseball Reference
 webpage <- read_html("http://www.baseball-reference.com/")
 tbls <- html_nodes(webpage, "table")
 if(League == "AL"){
@@ -138,8 +138,8 @@ is_tweet_length <- function(.x, n = 280) {
 assignInNamespace("is_tweet_length", is_tweet_length, ns = "rtweet")
 
 twitter_token <- create_token(
-  app = "NatsStandings",
-  consumer_key = "MYCONSUMERKEY",
+  app = "MY_APP_NAME",
+  consumer_key = "MY_CONSUMER_KEY",
   access_token = "MY_ACCESS_TOKEN",
   consumer_secret = "MY_CONSUMER_SECRET",
   access_secret = "MY_ACCESS_SECRET")
