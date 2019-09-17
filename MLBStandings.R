@@ -23,7 +23,7 @@ TeamMascot <- "Nationals"
 League <- "NL"
 Division <- "East"
 
-#scrape the league data fron Baseball Reference
+#scrape the data fron Baseball Reference####
 webpage <- read_html("http://www.baseball-reference.com/")
 tbls <- html_nodes(webpage, "table")
 if(League == "AL"){
@@ -53,11 +53,12 @@ LEAGUE <- LEAGUE[c(1:4, 6)]
 colnames(LEAGUE)[1] <- "LEAGUE"
 
 LEAGUE$Team <- rightchars(LEAGUE$LEAGUE, 3)
-LEAGUE$Clinch <- ifelse(leftchars(LEAGUE$LEAGUE, 1)=="y", "Y", 0)
+LEAGUE$DivClinch <- ifelse(leftchars(LEAGUE$LEAGUE, 1)=="y", "Y", 0)
+LEAGUE$PlayoffClinch <- ifelse(leftchars(LEAGUE$LEAGUE, 1)=="x", "Y", 0)
 LEAGUE$GB <- ifelse(LEAGUE$GB == "--", 0, LEAGUE$GB)
 LEAGUE$rank <- rank(as.numeric(LEAGUE$GB), ties.method = "min")
 #get rid of the silly skull and crossbones stuff for eliminated
-LEAGUE$E. <- ifelse(LEAGUE$E. == "☠" , "PE",LEAGUE$E.)
+LEAGUE$E. <- ifelse(LEAGUE$E. == "â " , "PE",LEAGUE$E.)
 
 
 #scrape BR for the LEAGUE Wildcard table
@@ -94,21 +95,21 @@ TeamDivPlace <- ordinal(as.numeric(LEAGUE$rank[match(TeamAbbr, LEAGUE$Team)]))
 TeamWin <- as.numeric(LEAGUE$W[match(TeamAbbr, LEAGUE$Team)])
 TeamLoss <- as.numeric(LEAGUE$L[match(TeamAbbr, LEAGUE$Team)])
 TeamGB <- as.numeric(LEAGUE$GB[match(TeamAbbr, LEAGUE$Team)])
-#if the team has been eliminated, say so, if not, dont say anything
-TeamDivElim <- ifelse(LEAGUE$E.[match(TeamAbbr, LEAGUE$Team)]=="PE" | TeamAbbr %!in% LEAGUEWC$Team, paste0("The ", TeamMascot, " have been eliminated from the playoff race. "),
-  ifelse(LEAGUE$E.[match(TeamAbbr, LEAGUE$Team)]=="E", paste0("The ", TeamMascot, " have been eliminated from the division race. "),
-                      ifelse(LEAGUE$E.[match(TeamAbbr, LEAGUE$Team)]!="--", paste0("Their division elimination number is ", LEAGUE$E.[match(TeamAbbr, LEAGUE$Team)], ". "), "")))
+#if the team has clinched a playoff spot, don't say anything, if they're leading the division, dont say anything, if they've been eliminated, say so, else, show what the elimination number is
+
+TeamDivElim <- ifelse(LEAGUE$DivClinch[match(TeamAbbr, LEAGUE$Team)] == "Y" | LEAGUE$PlayoffClinch[match(TeamAbbr, LEAGUE$Team)] == "Y" | LEAGUE$E.[match(TeamAbbr, LEAGUE$Team)]=="--", "", 
+                      ifelse(LEAGUE$E.[match(TeamAbbr, LEAGUE$Team)]=="PE" | TeamAbbr %!in% LEAGUEWC$Team , paste0("The ", TeamMascot, " have been eliminated from the playoff race. "),
+                            ifelse(LEAGUE$E.[match(TeamAbbr, LEAGUE$Team)]=="E", paste0("The ", TeamMascot, " have been eliminated from the division race. "),
+                                  ifelse(LEAGUE$E.[match(TeamAbbr, LEAGUE$Team)]!="--", paste0("Their division elimination number is ", LEAGUE$E.[match(TeamAbbr, LEAGUE$Team)], ". ")))))
+                                    
 TeamGamesPlayed <- TeamWin + TeamLoss
 TeamGamesLeft <- 162- (TeamWin + TeamLoss)
-TeamDivClinch <- ifelse(LEAGUE$Clinch[match(TeamAbbr, LEAGUE$Team)]=="Y", paste0("The ", TeamMascot, " have clinched the division!"), "")
+TeamDivClinch <- ifelse(LEAGUE$DivClinch[match(TeamAbbr, LEAGUE$Team)]=="Y", paste0("The ", TeamMascot, " have clinched the division!"), "")
 TeamWCRank <-ordinal(as.numeric(LEAGUEWC$rank[match(TeamAbbr, LEAGUEWC$Team)]))
 TeamWCGB <- as.numeric(LEAGUEWC$GB[match(TeamAbbr, LEAGUEWC$Team)])
-#if the team is in first place in the division, they're in, if they're not in the first of second in the wildcard, or if they're even in the wildcard hunt, they're out
-#TeamPlayoffs <- ifelse(TeamDivPlace == "1st", "in", ifelse(TeamWCGB < 0 |  TeamAbbr %!in% LEAGUEWC$Team, "out of", "in"))
-#if they're eliminated from the Wc, dont say anything, if they're not leading the WC, say their E number, everything else, dont say anything
 TeamWCElim <- ifelse( TeamAbbr %!in% LEAGUEWC$Team, "",  
                       ifelse(LEAGUEWC$E.[match(TeamAbbr, LEAGUEWC$Team)]!="--", paste0("Their wild card elimination number is ", LEAGUEWC$E.[match(TeamAbbr, LEAGUEWC$Team)], ". "), ""))
-
+TeamPlayoffClinch <- ifelse(LEAGUE$PlayoffClinch[match(TeamAbbr, LEAGUE$Team)]=="Y", paste0("The ", TeamMascot, " have clinched a spot in the playoffs!"), "")
 
 
 TweetDiv <- paste0("Through ", TeamGamesPlayed, " games, the ", TeamMascot, " are ", TeamWin, " and ", TeamLoss, ", good for ", TeamDivPlace, " in the ",  League, " ", Division, ". ")
@@ -116,16 +117,19 @@ TweetDivClinch <- TeamDivClinch
 TweetDivElim <- TeamDivElim
 TweetWC <- ifelse(TeamDivPlace == "1st" |LEAGUE$E.[match(TeamAbbr, LEAGUE$Team)]=="Eliminated" |  TeamAbbr %!in% LEAGUEWC$LEAGUE , "", paste0("In the Wild Card, the ", TeamMascot, " are in ", TeamWCRank, " place. ") )
 TweetWCElim <- TeamWCElim
-#TweetPlayoffs <- ifelse(LEAGUE$E.[match(TeamAbbr, LEAGUE$Team)]!="PE" &LEAGUE$E.[match(TeamAbbr, LEAGUE$Team)]!="E" & LEAGUE$Clinch[match(TeamAbbr, LEAGUE$Team)]!="Y" , paste0("If the season ended today, the ", TeamMascot, " would be ", TeamPlayoffs, " the playoffs.") ,"")
 
-Tweet <- paste0(TweetDiv,TweetDivClinch, TweetDivElim, TweetWC,TweetWCElim )
+Tweet <- paste0(TweetDiv,TweetDivClinch, TweetDivElim, TweetWC,TweetWCElim, TeamPlayoffClinch )
+nchar(Tweet)
+Tweet
 
-#not sure if this works, but don't tweet during the offseason
-if(TeamGamesPlayed<=162 & TeamGamesPlayed >=1){
+
+
+###Tweet####
+ if(TeamGamesPlayed<=162 & TeamGamesPlayed >=1){
 
 library(rtweet)
 
-#you need this to workaround the bug in rtweet that doesnt let you tweet becuase it thinks your tweet is too long
+
 is_tweet_length <- function(.x, n = 280) {
   .x <- gsub("https?://[[:graph:]]+\\s?", "", .x)
   while (grepl("^@\\S+\\s+", .x)) {
@@ -138,13 +142,12 @@ is_tweet_length <- function(.x, n = 280) {
 assignInNamespace("is_tweet_length", is_tweet_length, ns = "rtweet")
 
 twitter_token <- create_token(
-  app = "MY_APP_NAME",
-  consumer_key = "MY_CONSUMER_KEY",
-  access_token = "MY_ACCESS_TOKEN",
-  consumer_secret = "MY_CONSUMER_SECRET",
-  access_secret = "MY_ACCESS_SECRET")
+  app = "APP_NAME",
+  consumer_key = "CONSUMER_KEY",
+  access_token = "ACCESS_TOKEN",
+  consumer_secret = "CONSUMER_SECRET",
+  access_secret = "ACCESS_SECRET")
 post_tweet(Tweet)
-
-}
+ }
 
 Tweet
